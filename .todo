@@ -1,0 +1,9 @@
+//main link ref: https://github.com/wpcodevo/golang-gorm-postgres
+
+//FILTER PASSWORD DARI FETCH DATA USER DI CRUD :
+// ------controller/crud/ad/user.go
+// ------controller/crud/ad/user_role.go 
+// ------controller/auth/profiler.go
+
+//CREATE BACKEND SYSTEM UNTUK HANDLE UPDATE PASSWORD (controller/auth/profiler.go)
+//CREATE BACKEND SYSTEM UNTUK HANDLE FORGOT & REST PASSWORD (controller/auth/auth.go) link: https://codevoweb.com/forgot-reset-passwords-in-golang-with-html-email/
