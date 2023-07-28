@@ -8,22 +8,26 @@ import (
 
 // Create ad_user table in database
 type Users struct {
-	ID_User       uuid.UUID `gorm:"type:VARCHAR(100);column:kd_user;primaryKey"`
-	Fullname      string    `gorm:"type:VARCHAR(100);column:nama_lengkap"`
-	Username      string    `gorm:"type:VARCHAR(100);column:nama_user"`
-	Last_Login    time.Time `gorm:"type:DATETIME;column:last_login"`
-	Last_Logout   time.Time `gorm:"type:DATETIME;column:last_logout"`
-	Photo         []byte    `gorm:"type:BLOB;column:photo"`
-	Email         string    `gorm:"type:VARCHAR(100);column:email"`
-	NIK           string    `gorm:"type:VARCHAR(100);column:nik"`
-	Password      string    `gorm:"type:VARCHAR(100);column:password"`
-	Info          string    `gorm:"type:VARCHAR(300);column:keterangan"`
-	Status        string    `gorm:"type:CHAR(1);column:status"`
-	Serial_Number int       `gorm:"type:INT;column:no_urut"`
-	Created_At    time.Time `gorm:"type:DATETIME;column:tgl_rekam"`
-	Creator       string    `gorm:"type:VARCHAR(30);column:petugas_rekam"`
-	Updated_At    time.Time `gorm:"type:DATETIME;column:tgl_ubah"`
-	Updater       string    `gorm:"type:VARCHAR(30);column:petugas_ubah"`
+	ID_User             uuid.UUID `gorm:"type:VARCHAR(100);column:kd_user;primaryKey"`
+	Fullname            string    `gorm:"type:VARCHAR(100);column:nama_lengkap"`
+	Username            string    `gorm:"type:VARCHAR(100);column:nama_user"`
+	Last_Login          time.Time `gorm:"type:DATETIME;column:last_login"`
+	Last_Logout         time.Time `gorm:"type:DATETIME;column:last_logout"`
+	Photo               []byte    `gorm:"type:BLOB;column:photo"`
+	Email               string    `gorm:"type:VARCHAR(100);column:email"`
+	NIK                 string    `gorm:"type:VARCHAR(100);column:nik"`
+	Password            string    `gorm:"type:VARCHAR(100);column:password"`
+	EmailVerified       bool      `gorm:"column:email_verified;type:tinyint(1)"`
+	Info                string    `gorm:"type:VARCHAR(300);column:keterangan"`
+	Status              string    `gorm:"type:CHAR(1);column:status"`
+	Serial_Number       int       `gorm:"type:INT;column:no_urut"`
+	Created_At          time.Time `gorm:"type:DATETIME;column:tgl_rekam"`
+	Creator             string    `gorm:"type:VARCHAR(30);column:petugas_rekam"`
+	Updated_At          time.Time `gorm:"type:DATETIME;column:tgl_ubah"`
+	Updater             string    `gorm:"type:VARCHAR(30);column:petugas_ubah"`
+	VerificationCode    string
+	PasswordResetToken  string
+	PasswordResetExpiry time.Time
 }
 
 func (u *Users) TableName() string {
@@ -48,6 +52,12 @@ type NIKLoginRequest struct {
 
 type ForgotPasswordRequest struct {
 	Email string `json:"email" binding:"required"`
+}
+
+type UpdatePasswordByProfileRequest struct {
+	OldPassword        string `json:"old_password" binding:"required"`
+	NewPassword        string `json:"password" binding:"required"`
+	NewPasswordConfirm string `json:"password_confirm" binding:"required"`
 }
 
 type UpdatePasswordRequest struct {
