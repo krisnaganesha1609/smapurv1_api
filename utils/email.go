@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"html/template"
 	"log"
+	"os"
+	"path/filepath"
 	m "smapurv1_api/models"
 	s "smapurv1_api/setup"
 
@@ -19,7 +21,26 @@ type EmailData struct {
 	Subject   string
 }
 
-func SendEmail(user *m.Users, data *EmailData, temp *template.Template, templateName string) error {
+func TemplateParser(dir string) (*template.Template, error) {
+	var paths []string
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return template.ParseFiles(paths...)
+}
+
+func SendEmail(user *m.Users, data *EmailData, emailTemp string) {
 	config, err := s.LoadConfig(".")
 	if err != nil {
 		log.Fatal("Could not load config", err)
@@ -34,9 +55,12 @@ func SendEmail(user *m.Users, data *EmailData, temp *template.Template, template
 
 	var body bytes.Buffer
 
-	if err := temp.ExecuteTemplate(&body, templateName, &data); err != nil {
-		log.Fatal("Could not execute template", err)
+	template, err := TemplateParser("templates")
+	if err != nil {
+		log.Fatal("Could not parse templates", err)
 	}
+
+	template.ExecuteTemplate(&body, emailTemp, &data)
 
 	m := gomail.NewMessage()
 
@@ -50,8 +74,6 @@ func SendEmail(user *m.Users, data *EmailData, temp *template.Template, template
 	d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 
 	if err := d.DialAndSend(m); err != nil {
-		return err
+		log.Fatal("Could not send email", err)
 	}
-
-	return nil
 }
