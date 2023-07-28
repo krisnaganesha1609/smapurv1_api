@@ -56,6 +56,7 @@ require (
 	github.com/k3a/html2text v1.2.1
 	github.com/mileusna/useragent v1.3.3
 	github.com/spf13/viper v1.16.0
+	github.com/thanhpk/randstr v1.0.6
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gorm.io/gorm v1.25.2
 )
