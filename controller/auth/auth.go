@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"reflect"
@@ -15,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/mileusna/useragent"
+	"github.com/thanhpk/randstr"
 	"gorm.io/gorm"
 )
 
@@ -270,72 +272,114 @@ func (au *AuthController) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logged Out"})
 }
 
-// func (au *AuthController) ForgotPassword(ctx *gin.Context) {
-// 	var userCredential *m.ForgotPasswordRequest
+func (au *AuthController) VerifyEmail(c *gin.Context) {
+	getCode := c.Params.ByName("verificationCode")
+	verificationCode := u.EncodeBase64(getCode)
 
-// 	if err := ctx.ShouldBindJSON(&userCredential); err != nil {
-// 		ctx.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": err.Error()})
-// 		return
-// 	}
+	var updatedUser m.Users
+	result := au.DB.First(&updatedUser, "verification_code = ?", verificationCode)
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": "Invalid verification code or user doesn't exist"})
+		return
+	}
 
-// 	message := "You will receive a reset email if user with that email exist"
+	if updatedUser.EmailVerified {
+		c.JSON(http.StatusConflict, gin.H{"status": "fail", "message": "User already verified!"})
+		return
+	}
 
-// 	user, err := au.userService.FindUserByEmail(userCredential.Email)
-// 	if err != nil {
-// 		if err == mongo.ErrNoDocuments {
-// 			ctx.JSON(http.StatusOK, gin.H{"status": "fail", "message": message})
-// 			return
-// 		}
-// 		ctx.JSON(http.StatusBadGateway, gin.H{"status": "error", "message": err.Error()})
-// 		return
-// 	}
+	updatedUser.VerificationCode = ""
+	updatedUser.EmailVerified = true
+	au.DB.Save(&updatedUser)
 
-// 	if !user.Verified {
-// 		ctx.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "account not verified"})
-// 		return
-// 	}
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Email verified successfully!"})
+}
 
-// 	config, err := s.LoadConfig(".")
-// 	if err != nil {
-// 		log.Fatal("Could not load config", err)
-// 	}
+func (au *AuthController) ForgotPassword(ctx *gin.Context) {
+	var userCredential *m.ForgotPasswordRequest
 
-// 	// Generate Verification Code
-// 	resetToken := randstr.String(20)
+	if err := ctx.ShouldBindJSON(&userCredential); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": err.Error()})
+		return
+	}
 
-// 	passwordResetToken := u.EncodeBase64(resetToken)
+	message := "You will receive a reset email if user with that email exist"
 
-// 	// Update User in Database
-// 	query := bson.D{{Key: "email", Value: strings.ToLower(userCredential.Email)}}
-// 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "passwordResetToken", Value: passwordResetToken}, {Key: "passwordResetAt", Value: time.Now().Add(time.Minute * 15)}}}}
-// 	result, err := au.collection.UpdateOne(au.ctx, query, update)
+	var user m.Users
+	result := au.DB.First(&user, "email = ?", strings.ToLower(userCredential.Email))
+	if result.Error != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": "Invalid email"})
+		return
+	}
 
-// 	if result.MatchedCount == 0 {
-// 		ctx.JSON(http.StatusBadGateway, gin.H{"status": "success", "message": "There was an error sending email"})
-// 		return
-// 	}
+	//Implement verified user email after testing
 
-// 	if err != nil {
-// 		ctx.JSON(http.StatusForbidden, gin.H{"status": "success", "message": err.Error()})
-// 		return
-// 	}
-// 	var firstName = user.Name
+	// if !user.Verified {
+	// 	ctx.JSON(http.StatusUnauthorized, gin.H{"status": "error", "message": "account not verified"})
+	// 	return
+	// }
 
-// 	if strings.Contains(firstName, " ") {
-// 		firstName = strings.Split(firstName, " ")[1]
-// 	}
+	config, err := s.LoadConfig(".")
+	if err != nil {
+		log.Fatal("Could not load config", err)
+	}
 
-// 	// 👇 Send Email
-// 	emailData := u.EmailData{
-// 		URL:       config.Origin + "/resetpassword/" + resetToken,
-// 		FirstName: firstName,
-// 		Subject:   "Your password reset token (valid for 10min)",
-// 	}
+	// Generate Verification Code
+	resetToken := randstr.String(20)
 
-// 	err = u.SendEmail(user, &emailData, au.temp, "resetPassword.html")
-// 	if err != nil {
-// 		ctx.JSON(http.StatusBadGateway, gin.H{"status": "success", "message": "There was an error sending email"})
-// 		return
-// 	}
-// 	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": message})
-// }
+	passwordResetToken := u.EncodeBase64(resetToken)
+	user.PasswordResetToken = passwordResetToken
+	user.PasswordResetExpiry = time.Now().Add(time.Minute * 15)
+	au.DB.Save(&user)
+
+	var firstName = user.Fullname
+
+	if strings.Contains(firstName, " ") {
+		firstName = strings.Split(firstName, " ")[1]
+	}
+
+	// 👇 Send Email
+	emailData := u.EmailData{
+		URL:       config.ClientOrigin + "/resetpassword/" + resetToken,
+		FirstName: firstName,
+		Subject:   "Your password reset token (valid for 10min)",
+	}
+
+	u.SendEmail(&user, &emailData, "resetPassword.html")
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "success", "message": message})
+}
+
+func (au *AuthController) ResetPassword(c *gin.Context) {
+	var payload *m.UpdatePasswordRequest
+	resetToken := c.Params.ByName("resetToken")
+
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": err.Error()})
+		return
+	}
+
+	if payload.Password != payload.Password_Confirm {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": "Password doesn't match"})
+		return
+	}
+
+	hashedPassword, _ := u.HashingPassword(payload.Password)
+
+	passwordResetToken := u.EncodeBase64(resetToken)
+
+	var updatedUser m.Users
+	result := au.DB.First(&updatedUser, "password_reset_token = ? AND password_reset_at > ?", passwordResetToken, time.Now())
+	if result.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": "The reset token is invalid or has expired"})
+		return
+	}
+
+	updatedUser.Password = hashedPassword
+	updatedUser.PasswordResetToken = ""
+	updatedUser.Updated_At = time.Now()
+	updatedUser.Updater = "Reset Pass Token"
+	au.DB.Save(&updatedUser)
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Password successfully updated"})
+}

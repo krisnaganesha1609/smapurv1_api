@@ -20,5 +20,8 @@ func (ar *AuthRouter) AuthRoutes(rg *gin.RouterGroup) {
 
 	router.POST("/by-username", ar.authRouter.AuthenticateByUsername)
 	router.POST("/by-nik", ar.authRouter.AuthenticateByNIK)
-	router.GET("/logout", middleware.DeserializeUser(), ar.authRouter.Logout)
+	router.POST("/logout", middleware.DeserializeUser(), ar.authRouter.Logout)
+	router.GET("/verifyemail/:verificationCode", ar.authRouter.VerifyEmail)
+	router.POST("/forgotpassword", ar.authRouter.ForgotPassword)
+	router.PATCH("/resetpassword/:resetToken", ar.authRouter.ResetPassword)
 }
