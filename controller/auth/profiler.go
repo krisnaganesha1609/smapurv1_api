@@ -3,6 +3,7 @@ package auth
 import (
 	"net/http"
 	m "smapurv1_api/models"
+	u "smapurv1_api/utils"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,24 +21,8 @@ func NewProfilerController(DB *gorm.DB) ProfilerController {
 func (prc *ProfilerController) GetMe(c *gin.Context) {
 	currentUser := c.MustGet("currentUser").(m.Users)
 
-	// userResponse := &m.UserResponse{
-	// 	ID_User:       currentUser.ID_User,
-	// 	Fullname:      currentUser.Fullname,
-	// 	Username:      currentUser.Username,
-	// 	Last_Login:    currentUser.Last_Login,
-	// 	Last_Logout:   currentUser.Last_Logout,
-	// 	Photo:         currentUser.Photo,
-	// 	Email:         currentUser.Email,
-	// 	NIK:           currentUser.NIK,
-	// 	Info:          currentUser.Info,
-	// 	Status:        currentUser.Status,
-	// 	Serial_Number: currentUser.Serial_Number,
-	// 	Creator:       currentUser.Creator,
-	// 	Updater:       currentUser.Updater,
-	// }
-
 	var userWithRole []m.UserRole
-	if err := prc.DB.Where("kd_user = ?", currentUser.ID_User).Preload("User").Preload("Role").Find(&userWithRole).Error; err != nil {
+	if err := prc.DB.Select("DISTINCT ON (kd_user) *").Where("kd_user = ?", currentUser.ID_User).Preload("User").Preload("Role").Find(&userWithRole).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "fail", "message": err.Error()})
 		return
 	}
@@ -80,5 +65,39 @@ func (prc *ProfilerController) UpdateProfile(c *gin.Context) {
 }
 
 func (prc *ProfilerController) UpdatePassword(c *gin.Context) {
-	//Implement Update Password Method
+	currentUser := c.MustGet("currentUser").(m.Users)
+
+	var payload *m.UpdatePasswordByProfileRequest
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": err.Error()})
+		return
+	}
+
+	hashedOldPassword, _ := u.HashingPassword(payload.OldPassword)
+
+	if err := u.CheckPasswordHash(hashedOldPassword, currentUser.Password); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": "Invalid old password"})
+		return
+	}
+
+	if payload.NewPassword != payload.NewPasswordConfirm {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "fail", "message": "Password doesn't match"})
+		return
+	}
+
+	hashedNewPassword, _ := u.HashingPassword(payload.NewPassword)
+
+	var updatedUser m.Users
+	result := prc.DB.First(&updatedUser, "kd_user = ?", currentUser.ID_User)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "fail", "message": "User not found"})
+		return
+	}
+
+	updatedUser.Password = hashedNewPassword
+	updatedUser.Updated_At = time.Now()
+	updatedUser.Updater = currentUser.Fullname
+	prc.DB.Save(&updatedUser)
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Password updated successfully"})
 }
