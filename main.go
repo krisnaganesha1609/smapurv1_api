@@ -22,6 +22,9 @@ var (
 	AuthController auth.AuthController
 	AuthRouter     r.AuthRouter
 
+	ProfilerController auth.ProfilerController
+	ProfilerRouter     r.ProfilerRouter
+
 	MenuController ad.MenuController
 	MenuRouter     r.MenuRouter
 
@@ -78,6 +81,9 @@ func init() {
 
 	AuthController = auth.NewAuthController(s.DB)
 	AuthRouter = r.NewRouteAuthController(AuthController)
+
+	ProfilerController = auth.NewProfilerController(s.DB)
+	ProfilerRouter = r.NewRouteProfilerController(ProfilerController)
 
 	MenuController = ad.NewMenuController(s.DB)
 	MenuRouter = r.NewRouteMenuController(MenuController)
@@ -149,6 +155,7 @@ func main() {
 
 	//Connect the routes
 	AuthRouter.AuthRoutes(router)
+	ProfilerRouter.ProfilerRoutes(router)
 	MenuRouter.MenuRoutes(router)
 	RoleRouter.RoleRoutes(router)
 	UserRouter.UserRoutes(router)
